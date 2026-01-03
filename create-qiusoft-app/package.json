@@ -1,0 +1,35 @@
+{
+  "name": "create-qiusoft-app",
+  "version": "0.1.0",
+  "description": "Create a qiusoft app from template",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-qiusoft-app": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node --enable-source-maps dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "commander": "^12.1.0",
+    "fast-glob": "^3.3.2",
+    "fs-extra": "^11.2.0",
+    "micromatch": "^4.0.8",
+    "undici": "^6.19.8"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/node": "^22.10.1",
+    "typescript": "^5.5.4"
+  }
+}
