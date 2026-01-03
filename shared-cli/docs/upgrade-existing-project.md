@@ -50,6 +50,20 @@ yarn update:shared -- --allow-dirty
 - 如果你希望先确认将要更新的内容，可用 `--dry-run` 或 `--check`。
 - 如遇到 “共享目录存在未提交改动”，可临时使用 `--allow-dirty`。
 
+## 可选：添加业务子库
+
+查看可用子库：
+
+```
+npx qiusoft-shared-cli submodule list
+```
+
+添加子库（示例）：
+
+```
+npx qiusoft-shared-cli submodule add appMes appWms
+```
+
 ## 一次性初始化项
 
 以下内容只在初始化阶段处理一次，后续不会同步覆盖：

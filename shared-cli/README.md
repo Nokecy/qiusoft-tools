@@ -8,6 +8,42 @@
 shared-cli update
 ```
 
+## 子库管理
+
+列出可用子库：
+
+```
+shared-cli submodule list
+```
+
+添加指定子库：
+
+```
+shared-cli submodule add appMes appWms
+```
+
+添加全部子库：
+
+```
+shared-cli submodule add --all
+```
+
+仅预览：
+
+```
+shared-cli submodule add appMes --dry-run
+```
+
+## 子库列表
+
+- appSYS
+- appMES
+- appWMS
+- appPDM
+- appWorkflow
+- appTMS
+- appCommon
+
 ## 已有项目升级
 
 查看 [已有项目接入指南](docs/upgrade-existing-project.md)。
