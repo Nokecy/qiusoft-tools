@@ -47,7 +47,7 @@ export async function cmdUpdate(options: {
     return;
   }
 
-  const destPaths = manifest.includes.map(m => m.to);
+  const destPaths = manifest.includes.filter(m => !m.skipIfExists).map(m => m.to);
   if (!options.allowDirty) {
     const dirty = isGitDirty(projectRoot, destPaths);
     if (dirty) throw new Error('共享目录存在未提交改动，请先提交/暂存或使用 --allow-dirty。');

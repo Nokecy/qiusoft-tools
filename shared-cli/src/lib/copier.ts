@@ -23,6 +23,7 @@ export async function syncOneMapping(opts: {
   exclude: string[];
   backupDir?: string;
   dryRun?: boolean;
+  skipIfExists?: boolean;
 }) {
   const srcRoot = path.join(opts.repoDir, opts.from);
   const dstRoot = path.join(opts.projectRoot, opts.to);
@@ -32,6 +33,12 @@ export async function syncOneMapping(opts: {
   }
 
   const srcStat = await fs.stat(srcRoot);
+  if (opts.skipIfExists && (await fs.pathExists(dstRoot))) {
+    if (opts.dryRun) {
+      console.log(`[skip] ${opts.from} -> ${opts.to} (target exists)`);
+    }
+    return;
+  }
   const fromPosix = toPosix(opts.from);
 
   if (srcStat.isFile()) {
@@ -105,7 +112,7 @@ export async function syncOneMapping(opts: {
 export async function syncMappings(opts: {
   repoDir: string;
   projectRoot: string;
-  mappings: { from: string; to: string }[];
+  mappings: { from: string; to: string; skipIfExists?: boolean }[];
   exclude: string[];
   backupDir?: string;
   dryRun?: boolean;
@@ -119,6 +126,7 @@ export async function syncMappings(opts: {
       exclude: opts.exclude,
       backupDir: opts.backupDir,
       dryRun: opts.dryRun,
+      skipIfExists: m.skipIfExists,
     });
   }
 }

@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs-extra';
 
-export type SharedMapping = { from: string; to: string };
+export type SharedMapping = { from: string; to: string; skipIfExists?: boolean };
 
 export type SharedManifest = {
   includes: SharedMapping[];
