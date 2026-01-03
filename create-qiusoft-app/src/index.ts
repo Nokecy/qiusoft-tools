@@ -9,7 +9,7 @@ import { fetch } from 'undici';
 import { Command } from 'commander';
 import { spawnSync } from 'child_process';
 
-type SharedMapping = { from: string; to: string };
+type SharedMapping = { from: string; to: string; skipIfExists?: boolean };
 type SharedManifest = { includes: SharedMapping[]; exclude?: string[] };
 
 const DEFAULT_REPO =
@@ -17,6 +17,50 @@ const DEFAULT_REPO =
 const DEFAULT_REF = 'main';
 const DEFAULT_TOKEN_ENV = 'GITHUB_TOKEN';
 const DEFAULT_MANIFEST = 'shared.manifest.json';
+
+type SubmoduleInfo = {
+  name: string;
+  path: string;
+  url: string;
+};
+
+const SUBMODULES: SubmoduleInfo[] = [
+  {
+    name: 'appSYS',
+    path: 'src/pages/appSYS',
+    url: 'https://cnb.cool/qc_software/sub_common/web_appSys',
+  },
+  {
+    name: 'appMES',
+    path: 'src/pages/appMES',
+    url: 'https://cnb.cool/qc_software/sub_common/web_MES',
+  },
+  {
+    name: 'appWMS',
+    path: 'src/pages/appWMS',
+    url: 'https://cnb.cool/qc_software/sub_common/web_WMS',
+  },
+  {
+    name: 'appPDM',
+    path: 'src/pages/appPDM',
+    url: 'https://cnb.cool/qc_software/sub_common/web_pdm',
+  },
+  {
+    name: 'appWorkflow',
+    path: 'src/pages/appWorkflow',
+    url: 'https://cnb.cool/qc_software/sub_common/web_workflow',
+  },
+  {
+    name: 'appTMS',
+    path: 'src/pages/appTMS',
+    url: 'https://cnb.cool/qc_software/sub_common/web_TMS',
+  },
+  {
+    name: 'appCommon',
+    path: 'src/pages/appCommon',
+    url: 'https://cnb.cool/qc_software/sub_common/sub_web_erpCommon',
+  },
+];
 
 type GithubRepo = { owner: string; name: string };
 
@@ -115,6 +159,48 @@ function shouldIgnore(relFromMapping: string, relFromRepo: string, ignore: strin
   );
 }
 
+function listSubmodules() {
+  return [...SUBMODULES];
+}
+
+function resolveSubmodules(names: string[]) {
+  const map = new Map(SUBMODULES.map(item => [normalizeName(item.name), item]));
+  const result: SubmoduleInfo[] = [];
+  const unknown: string[] = [];
+  for (const name of names) {
+    const key = normalizeName(name);
+    const found = map.get(key);
+    if (!found) {
+      unknown.push(name);
+      continue;
+    }
+    if (!result.find(item => item.name === found.name)) {
+      result.push(found);
+    }
+  }
+  if (unknown.length > 0) {
+    const available = SUBMODULES.map(item => item.name).join(', ');
+    throw new Error(`未知子库: ${unknown.join(', ')}。可选: ${available}`);
+  }
+  return result;
+}
+
+function parseSubmodulesOption(raw?: string): SubmoduleInfo[] {
+  if (!raw) return [];
+  const value = raw.trim();
+  if (!value || value.toLowerCase() === 'none') return [];
+  if (value.toLowerCase() === 'all') return listSubmodules();
+  const names = value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+  return resolveSubmodules(names);
+}
+
+function normalizeName(name: string) {
+  return name.replace(/\s+/g, '').toLowerCase();
+}
+
 async function readManifest(repoDir: string, manifestFile: string): Promise<SharedManifest> {
   const p = path.join(repoDir, manifestFile);
   if (!(await fs.pathExists(p))) {
@@ -139,6 +225,9 @@ async function copyMappings(opts: {
     const dstRoot = path.join(opts.targetRoot, m.to);
     if (!(await fs.pathExists(srcRoot))) {
       throw new Error(`Source not found: ${m.from}`);
+    }
+    if (m.skipIfExists && (await fs.pathExists(dstRoot))) {
+      continue;
     }
 
     const srcStat = await fs.stat(srcRoot);
@@ -217,6 +306,47 @@ function ensureSubmodules(targetRoot: string) {
   });
   if (update.status !== 0) {
     throw new Error('子模块初始化失败，请检查网络或访问权限。');
+  }
+}
+
+function addSubmodules(targetRoot: string, submodules: SubmoduleInfo[]) {
+  if (submodules.length === 0) return;
+
+  const hasGit = spawnSync('git', ['--version'], { stdio: 'ignore' });
+  if (hasGit.status !== 0) {
+    throw new Error('未检测到 git，请先安装 git。');
+  }
+
+  const gitDir = path.join(targetRoot, '.git');
+  if (!fs.existsSync(gitDir)) {
+    const init = spawnSync('git', ['init'], { cwd: targetRoot, stdio: 'inherit' });
+    if (init.status !== 0) {
+      throw new Error('git init 失败，请检查 git 环境。');
+    }
+  }
+
+  let added = 0;
+  for (const mod of submodules) {
+    const submodulePath = path.join(targetRoot, mod.path);
+    if (fs.existsSync(submodulePath)) continue;
+    const add = spawnSync('git', ['submodule', 'add', '-f', mod.url, mod.path], {
+      cwd: targetRoot,
+      stdio: 'inherit',
+    });
+    if (add.status !== 0) {
+      throw new Error(`子模块添加失败: ${mod.name}`);
+    }
+    added += 1;
+  }
+
+  if (added > 0) {
+    const update = spawnSync('git', ['submodule', 'update', '--init', '--recursive'], {
+      cwd: targetRoot,
+      stdio: 'inherit',
+    });
+    if (update.status !== 0) {
+      throw new Error('子模块初始化失败，请检查网络或访问权限。');
+    }
   }
 }
 
@@ -304,6 +434,10 @@ async function main() {
     .option('--ref <ref>', '分支/标签/提交', DEFAULT_REF)
     .option('--token-env <name>', '访问令牌环境变量名', DEFAULT_TOKEN_ENV)
     .option('--manifest <path>', '共享清单文件名', DEFAULT_MANIFEST)
+    .option(
+      '--submodules <list>',
+      '选择子库（逗号分隔），可用: appMes,appWms,appPdm,appWorkflow,appTms,appCommon,appSYS | all | none'
+    )
     .option('--skip-install', '跳过 yarn install')
     .parse();
 
@@ -357,6 +491,8 @@ async function main() {
   });
 
   ensureSubmodules(targetRoot);
+  const extraSubmodules = parseSubmodulesOption(opts.submodules);
+  addSubmodules(targetRoot, extraSubmodules);
 
   if (snapshot.tempRoot) {
     await fs.remove(snapshot.tempRoot).catch(() => {});

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { cmdUpdate } from './commands/update.js';
+import { cmdSubmoduleAdd, cmdSubmoduleList } from './commands/submodule.js';
 
 const program = new Command();
 
-program.name('shared-cli').description('Sync shared code into projects').version('0.1.0');
+program.name('shared-cli').description('Sync shared code into projects').version('0.1.2');
 
 program
   .command('update')
@@ -21,6 +22,30 @@ program
       dryRun: !!opts.dryRun,
       force: !!opts.force,
       allowDirty: !!opts.allowDirty,
+    });
+  });
+
+const submodule = program.command('submodule').description('管理项目子库');
+
+submodule
+  .command('list')
+  .description('列出可用子库')
+  .action(async () => {
+    await cmdSubmoduleList();
+  });
+
+submodule
+  .command('add')
+  .description('添加子库')
+  .argument('[names...]', '子库名称')
+  .option('--all', '添加全部子库')
+  .option('--dry-run', '仅预览，不执行')
+  .action(async (names: string[], opts: { all?: boolean; dryRun?: boolean }) => {
+    await cmdSubmoduleAdd({
+      cwd: process.cwd(),
+      names,
+      all: !!opts.all,
+      dryRun: !!opts.dryRun,
     });
   });
 

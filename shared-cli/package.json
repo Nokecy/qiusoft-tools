@@ -1,6 +1,6 @@
 {
   "name": "qiusoft-shared-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Sync shared code into projects",
   "license": "MIT",
   "type": "module",
