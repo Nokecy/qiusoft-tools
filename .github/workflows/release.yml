@@ -1,0 +1,60 @@
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "要发布的包"
+        required: true
+        type: choice
+        options:
+          - shared-cli
+          - create-qiusoft-app
+  push:
+    tags:
+      - "shared-cli/v*"
+      - "create-qiusoft-app/v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Resolve package
+        id: resolve
+        run: |
+          if [ -n "${{ github.event.inputs.package }}" ]; then
+            pkg="${{ github.event.inputs.package }}"
+          else
+            tag="${GITHUB_REF#refs/tags/}"
+            case "$tag" in
+              shared-cli/*) pkg="shared-cli" ;;
+              create-qiusoft-app/*) pkg="create-qiusoft-app" ;;
+              *) echo "未知标签: $tag"; exit 1 ;;
+            esac
+          fi
+          echo "pkg=$pkg" >> $GITHUB_OUTPUT
+
+      - name: Install
+        working-directory: ${{ steps.resolve.outputs.pkg }}
+        run: yarn install
+
+      - name: Build
+        working-directory: ${{ steps.resolve.outputs.pkg }}
+        run: yarn build
+
+      - name: Publish
+        working-directory: ${{ steps.resolve.outputs.pkg }}
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
