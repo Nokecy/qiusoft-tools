@@ -5,6 +5,9 @@
 - shared-cli（同步共享模板）
 - create-qiusoft-app（初始化项目）
 
+shared-cli 相关文档：
+- [已有项目接入指南](shared-cli/docs/upgrade-existing-project.md)
+
 ## 目录结构
 
 ```
