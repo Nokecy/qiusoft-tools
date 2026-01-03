@@ -8,6 +8,8 @@ import micromatch from 'micromatch';
 import { fetch } from 'undici';
 import { Command } from 'commander';
 import { spawnSync } from 'child_process';
+import { createInterface } from 'node:readline/promises';
+import { stdin, stdout } from 'node:process';
 
 type SharedMapping = { from: string; to: string; skipIfExists?: boolean };
 type SharedManifest = { includes: SharedMapping[]; exclude?: string[] };
@@ -187,14 +189,51 @@ function resolveSubmodules(names: string[]) {
 
 function parseSubmodulesOption(raw?: string): SubmoduleInfo[] {
   if (!raw) return [];
+  return parseSubmodulesInput(raw, listSubmodules());
+}
+
+function parseSubmodulesInput(raw: string, available: SubmoduleInfo[]): SubmoduleInfo[] {
   const value = raw.trim();
   if (!value || value.toLowerCase() === 'none') return [];
-  if (value.toLowerCase() === 'all') return listSubmodules();
-  const names = value
+  if (value.toLowerCase() === 'all') return available;
+
+  const tokens = value
     .split(',')
     .map(item => item.trim())
     .filter(Boolean);
-  return resolveSubmodules(names);
+  if (tokens.length === 0) return [];
+
+  const byIndex: SubmoduleInfo[] = [];
+  const byName: string[] = [];
+  for (const token of tokens) {
+    if (/^\d+$/.test(token)) {
+      const index = Number(token) - 1;
+      if (index < 0 || index >= available.length) {
+        throw new Error(`子库序号无效: ${token}`);
+      }
+      byIndex.push(available[index]);
+      continue;
+    }
+    byName.push(token);
+  }
+
+  const resolvedByName = byName.length > 0 ? resolveSubmodules(byName) : [];
+  const merged = [...byIndex, ...resolvedByName];
+  const uniq = new Map(merged.map(item => [item.name, item]));
+  return Array.from(uniq.values());
+}
+
+async function promptSubmodules(): Promise<SubmoduleInfo[]> {
+  const items = listSubmodules();
+  console.log('可选扩展子库（默认已包含 appSYS）：');
+  items.forEach((item, index) => {
+    console.log(`  ${index + 1}. ${item.name} - ${item.url}`);
+  });
+
+  const rl = createInterface({ input: stdin, output: stdout });
+  const answer = await rl.question('请选择子库（逗号分隔编号/名称，all/none，回车跳过）：');
+  rl.close();
+  return parseSubmodulesInput(answer ?? '', items);
 }
 
 function normalizeName(name: string) {
@@ -438,6 +477,7 @@ async function main() {
       '--submodules <list>',
       '选择子库（逗号分隔），可用: appMes,appWms,appPdm,appWorkflow,appTms,appCommon,appSYS | all | none'
     )
+    .option('--interactive', '交互式选择子库')
     .option('--skip-install', '跳过 yarn install')
     .parse();
 
@@ -491,7 +531,9 @@ async function main() {
   });
 
   ensureSubmodules(targetRoot);
-  const extraSubmodules = parseSubmodulesOption(opts.submodules);
+  const extraSubmodules = opts.interactive
+    ? await promptSubmodules()
+    : parseSubmodulesOption(opts.submodules);
   addSubmodules(targetRoot, extraSubmodules);
 
   if (snapshot.tempRoot) {
