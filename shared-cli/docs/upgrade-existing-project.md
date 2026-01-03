@@ -58,6 +58,20 @@ yarn update:shared -- --allow-dirty
 
 如果你的项目还没有这些目录，请从模板仓库复制一份后再执行同步。
 
+## 可选：配置项目标题
+
+登录页标题由项目配置控制。建议在项目根目录新增 `config/project.local.ts`：
+
+```ts
+export default {
+  appTitle: '你的平台名称',
+};
+```
+
+说明：
+- `appTitle` 未配置时，默认使用 `${appName}数字平台`。
+- `config/project.local.ts` 不记入同步范围，通常用于项目私有配置。
+
 ## 同步规则（要点）
 
 实际同步范围由 `shared.manifest.json` 控制，重点规则如下：
