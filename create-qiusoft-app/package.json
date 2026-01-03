@@ -1,6 +1,6 @@
 {
   "name": "create-qiusoft-app",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Create a qiusoft app from template",
   "license": "MIT",
   "type": "module",
@@ -29,6 +29,8 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.5",
+    "@types/fs-extra": "^11.0.4",
+    "@types/micromatch": "^4.0.9",
     "@types/node": "^22.10.1",
     "typescript": "^5.5.4"
   }

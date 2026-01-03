@@ -198,6 +198,19 @@ function ensureSubmodules(targetRoot: string) {
     }
   }
 
+  const submodules = readGitmodules(targetRoot);
+  for (const mod of submodules) {
+    const submodulePath = path.join(targetRoot, mod.path);
+    if (fs.existsSync(submodulePath)) continue;
+    const add = spawnSync('git', ['submodule', 'add', '-f', mod.url, mod.path], {
+      cwd: targetRoot,
+      stdio: 'inherit',
+    });
+    if (add.status !== 0) {
+      throw new Error(`子模块添加失败: ${mod.path}`);
+    }
+  }
+
   const update = spawnSync('git', ['submodule', 'update', '--init', '--recursive'], {
     cwd: targetRoot,
     stdio: 'inherit',
@@ -205,6 +218,29 @@ function ensureSubmodules(targetRoot: string) {
   if (update.status !== 0) {
     throw new Error('子模块初始化失败，请检查网络或访问权限。');
   }
+}
+
+function readGitmodules(targetRoot: string) {
+  const result = spawnSync(
+    'git',
+    ['config', '-f', '.gitmodules', '--get-regexp', '^submodule\\..*\\.path$'],
+    { cwd: targetRoot, encoding: 'utf8' }
+  );
+  if (result.status !== 0 || !result.stdout) return [];
+  return result.stdout
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map(line => {
+      const [key, value] = line.split(/\s+/, 2);
+      const name = key.replace(/^submodule\./, '').replace(/\.path$/, '');
+      const url = spawnSync(
+        'git',
+        ['config', '-f', '.gitmodules', '--get', `submodule.${name}.url`],
+        { cwd: targetRoot, encoding: 'utf8' }
+      ).stdout.trim();
+      return { name, path: value, url };
+    })
+    .filter(mod => mod.path && mod.url);
 }
 
 async function ensureProjectLocal(opts: { repoDir: string; targetRoot: string; relativePath?: string }) {
